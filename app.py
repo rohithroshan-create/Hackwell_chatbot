@@ -129,6 +129,30 @@ def google_chatbot_query(message: str):
     except Exception as e:
         return f"⚠ Error: {e}"
 
+def safe_scalar(value):
+    """Convert any value to a safe scalar for comparisons"""
+    try:
+        if isinstance(value, (np.ndarray, list)):
+            return float(value) if len(value) > 0 else 0.0
+        elif isinstance(value, (pd.Series)):
+            return float(value.iloc) if len(value) > 0 else 0.0
+        else:
+            return float(value)
+    except (ValueError, TypeError, IndexError):
+        return 0.0
+
+def safe_int_scalar(value):
+    """Convert any value to a safe integer scalar"""
+    try:
+        if isinstance(value, (np.ndarray, list)):
+            return int(value) if len(value) > 0 else 0
+        elif isinstance(value, (pd.Series)):
+            return int(value.iloc) if len(value) > 0 else 0
+        else:
+            return int(value)
+    except (ValueError, TypeError, IndexError):
+        return 0
+
 class WellnessAssistant:
     def __init__(self):
         self.models = {}
@@ -170,10 +194,13 @@ class WellnessAssistant:
             
             # Load performance metrics
             if os.path.exists('performance_metrics.pkl'):
-                self.performance_metrics = joblib.load('performance_metrics.pkl')
+                try:
+                    self.performance_metrics = joblib.load('performance_metrics.pkl')
+                except:
+                    pass
             
             if models_loaded == 0:
-                st.error("❌ No models loaded. Creating demo models...")
+                st.warning("⚠️ No trained models found. Creating demo models...")
                 self.create_demo_models()
             else:
                 st.info(f"📊 Loaded {models_loaded}/3 models successfully")
@@ -191,9 +218,9 @@ class WellnessAssistant:
         
         # Demo performance metrics
         self.performance_metrics = {
-            'heart_disease': {'accuracy': 0.87, 'auc': 0.92, 'model_name': 'XGBoost'},
-            'diabetes': {'accuracy': 0.85, 'auc': 0.89, 'model_name': 'Random Forest'},
-            'hypertension': {'accuracy': 0.83, 'auc': 0.88, 'model_name': 'Logistic Regression'}
+            'heart_disease': {'accuracy': 0.87, 'auc': 0.92, 'model_name': 'XGBoost (Demo)'},
+            'diabetes': {'accuracy': 0.85, 'auc': 0.89, 'model_name': 'Random Forest (Demo)'},
+            'hypertension': {'accuracy': 0.83, 'auc': 0.88, 'model_name': 'Logistic Regression (Demo)'}
         }
         
         # Create simple demo models
@@ -201,6 +228,7 @@ class WellnessAssistant:
             n_features = {'heart_disease': 14, 'diabetes': 10, 'hypertension': 13}[condition]
             
             # Create demo training data
+            np.random.seed(42)
             X_demo = np.random.rand(100, n_features)
             y_demo = np.random.randint(0, 2, 100)
             
@@ -269,76 +297,128 @@ class WellnessAssistant:
         }
     
     def predict_risk(self, patient_data, condition):
-        """Predict disease risk with better error handling"""
+        """Predict disease risk with FIXED array handling"""
         if condition not in self.models:
             st.error(f"Model for {condition} not available")
             return None
         
         try:
-            # Prepare features based on condition
+            # Convert all patient data to safe scalars to avoid array ambiguity
+            age = safe_int_scalar(patient_data['age'])
+            gender = patient_data['gender']
+            bmi = safe_scalar(patient_data['bmi'])
+            systolic_bp = safe_scalar(patient_data['systolic_bp'])
+            diastolic_bp = safe_scalar(patient_data['diastolic_bp'])
+            glucose = safe_scalar(patient_data['glucose'])
+            cholesterol = safe_scalar(patient_data['cholesterol'])
+            heart_rate = safe_scalar(patient_data['heart_rate'])
+            exercise_freq = patient_data['exercise_freq']
+            smoking = patient_data['smoking']
+            alcohol = patient_data['alcohol']
+            sleep_hours = safe_scalar(patient_data['sleep_hours'])
+            stress_level = safe_scalar(patient_data['stress_level'])
+            family_history = patient_data['family_history']
+            current_conditions = patient_data['current_conditions']
+            
+            # Prepare features based on condition with FIXED comparisons
             if condition == 'heart_disease':
+                # All comparisons now use scalar values
                 features = [
-                    patient_data['age'],
-                    1 if patient_data['gender'] == 'Male' else 0,
+                    age,
+                    1 if gender == 'Male' else 0,
                     1,  # chest pain type (default)
-                    patient_data['systolic_bp'],
-                    patient_data['cholesterol'],
-                    1 if patient_data['glucose'] > 120 else 0,
+                    systolic_bp,
+                    cholesterol,
+                    1 if glucose > 120 else 0,  # Fixed: Now uses scalar
                     0,  # rest ECG
-                    patient_data['heart_rate'],
+                    heart_rate,
                     0,  # exercise induced angina
                     0,  # oldpeak
                     1,  # slope
                     0,  # ca
                     2,  # thal
-                    # Age group feature
-                    0 if patient_data['age'] < 40 else 1 if patient_data['age'] < 55 else 2 if patient_data['age'] < 70 else 3
+                    # Age group feature - Fixed comparison
+                    0 if age < 40 else 1 if age < 55 else 2 if age < 70 else 3
                 ]
             
             elif condition == 'diabetes':
+                # Fixed: All comparisons use scalars
+                pregnancies = 0 if gender == 'Male' else max(0, min(5, (age - 20) // 5))
+                
                 features = [
-                    0 if patient_data['gender'] == 'Male' else min(5, max(0, (patient_data['age'] - 20) // 5)),  # pregnancies
-                    patient_data['glucose'],
-                    patient_data['diastolic_bp'],
+                    pregnancies,
+                    glucose,
+                    diastolic_bp,
                     20,  # skin thickness (default)
                     85,  # insulin (default)
-                    patient_data['bmi'],
+                    bmi,
                     0.5,  # diabetes pedigree function
-                    patient_data['age'],
-                    # BMI category
-                    0 if patient_data['bmi'] < 18.5 else 1 if patient_data['bmi'] < 25 else 2 if patient_data['bmi'] < 30 else 3,
-                    # Glucose category
-                    0 if patient_data['glucose'] < 100 else 1 if patient_data['glucose'] < 126 else 2
+                    age,
+                    # BMI category - Fixed comparison
+                    0 if bmi < 18.5 else 1 if bmi < 25 else 2 if bmi < 30 else 3,
+                    # Glucose category - Fixed comparison
+                    0 if glucose < 100 else 1 if glucose < 126 else 2
                 ]
             
             elif condition == 'hypertension':
+                # Fixed: All comparisons use scalars and safe checks
+                smoking_current = 1 if smoking == 'Current' else 0
+                alcohol_heavy = 1 if alcohol in ['Moderate', 'Heavy'] else 0
+                exercise_active = 2 if exercise_freq == 'Daily' else 1 if ('3-4' in exercise_freq or '5+' in exercise_freq) else 0
+                family_hyp = 1 if 'Hypertension' in family_history else 0
+                diabetes_condition = 1 if 'Diabetes' in current_conditions else 0
+                obese = 1 if bmi > 30 else 0
+                high_stress = 2 if stress_level > 7 else 1 if stress_level > 4 else 0
+                
                 features = [
-                    patient_data['age'],
-                    1 if patient_data['gender'] == 'Male' else 0,
-                    1 if patient_data['smoking'] == 'Current' else 0,
-                    1 if patient_data['alcohol'] in ['Moderate', 'Heavy'] else 0,
-                    2 if patient_data['exercise_freq'] == 'Daily' else 1 if '3-4' in patient_data['exercise_freq'] or '5+' in patient_data['exercise_freq'] else 0,
-                    1 if 'Hypertension' in patient_data['family_history'] else 0,
-                    1 if 'Diabetes' in patient_data['current_conditions'] else 0,
-                    1 if patient_data['bmi'] > 30 else 0,
-                    2 if patient_data['stress_level'] > 7 else 1 if patient_data['stress_level'] > 4 else 0,
+                    age,
+                    1 if gender == 'Male' else 0,
+                    smoking_current,
+                    alcohol_heavy,
+                    exercise_active,
+                    family_hyp,
+                    diabetes_condition,
+                    obese,
+                    high_stress,
                     2,  # salt intake (default high)
-                    patient_data['sleep_hours'],
+                    sleep_hours,
                     8,  # work hours (default)
-                    # Age risk category
-                    0 if patient_data['age'] < 35 else 1 if patient_data['age'] < 50 else 2 if patient_data['age'] < 65 else 3
+                    # Age risk category - Fixed comparison
+                    0 if age < 35 else 1 if age < 50 else 2 if age < 65 else 3
                 ]
             
-            # Ensure we have the right number of features
-            features_array = np.array(features).reshape(1, -1)
+            # Convert to numpy array
+            features_array = np.array(features, dtype=float).reshape(1, -1)
+            
+            # Debug info
+            st.write(f"Debug - {condition} features shape: {features_array.shape}")
+            st.write(f"Debug - {condition} features: {features}")
             
             # Scale features if scaler available
             if condition in self.scalers:
-                features_array = self.scalers[condition].transform(features_array)
+                try:
+                    features_array = self.scalers[condition].transform(features_array)
+                except Exception as scale_error:
+                    st.warning(f"Scaling error for {condition}: {scale_error}")
             
             # Get prediction
             model = self.models[condition]
-            probability = model.predict_proba(features_array)
+            
+            # Make prediction with error handling
+            try:
+                prob_array = model.predict_proba(features_array)
+                if len(prob_array.shape) == 2 and prob_array.shape >= 2:
+                    probability = float(prob_array)  # Get positive class probability
+                else:
+                    probability = float(prob_array)  # Single probability
+                    
+            except Exception as pred_error:
+                st.error(f"Prediction error: {pred_error}")
+                # Return default prediction
+                probability = 0.5
+            
+            # Ensure probability is a scalar
+            probability = max(0.0, min(1.0, float(probability)))
             
             # Risk categorization
             if probability < 0.3:
@@ -360,7 +440,10 @@ class WellnessAssistant:
             
         except Exception as e:
             st.error(f"Error predicting {condition}: {str(e)}")
-            # Return a default prediction to prevent app crash
+            import traceback
+            st.error(f"Detailed error: {traceback.format_exc()}")
+            
+            # Return a safe default prediction to prevent app crash
             return {
                 'probability': 0.5,
                 'risk_level': "Moderate",
@@ -454,15 +537,22 @@ def main():
                     predictions = {}
                     
                     for condition in conditions:
+                        st.write(f"🔄 Predicting {condition}...")
                         pred = assistant.predict_risk(patient_data, condition)
                         if pred:
                             predictions[condition] = pred
+                            st.success(f"✅ {condition} prediction complete")
+                        else:
+                            st.error(f"❌ {condition} prediction failed")
                     
                     # Store in session state
                     st.session_state.predictions = predictions
                     st.session_state.patient_data = patient_data
                     
-                    st.success("✅ Analysis complete!")
+                    if predictions:
+                        st.success("✅ Analysis complete!")
+                    else:
+                        st.error("❌ No predictions generated")
         
         # Display results
         if 'predictions' in st.session_state and st.session_state.predictions:
@@ -492,7 +582,7 @@ def main():
                         fig = assistant.create_risk_gauge(pred['probability'], condition, pred['color'])
                         st.plotly_chart(fig, use_container_width=True)
             else:
-                st.error("⚠️ No predictions available. Please try the analysis again.")
+                st.error("⚠️ No valid predictions available. Please try the analysis again.")
         
         elif 'predictions' in st.session_state:
             st.warning("⚠️ No predictions available. Please complete the health assessment.")
