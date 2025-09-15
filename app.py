@@ -110,7 +110,7 @@ st.markdown("""
 GOOGLE_API_KEY = "AIzaSyANnfoI2zSuanVqLEk7oqXq-q-whzPFouA"  # Your provided key
 genai.configure(api_key=GOOGLE_API_KEY)
 
-CHAT_MODEL_NAME = "models/gemini-2.5-flash"
+CHAT_MODEL_NAME = "models/gemini-2.0-flash"
 chat_model = genai.GenerativeModel(
     CHAT_MODEL_NAME,
     system_instruction=(
@@ -689,4 +689,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
