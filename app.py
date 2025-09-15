@@ -107,7 +107,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Your exact Google Gemini setup
-GOOGLE_API_KEY = "AIzaSyANnfoI2zSuanVqLEk7oqXq-q-whzPFouA"  # Your provided key
+GOOGLE_API_KEY = "AIzaSyAZxxa76tpI0Wja05_birLVbo-cxXUsWRM"  # Your provided key
 genai.configure(api_key=GOOGLE_API_KEY)
 
 CHAT_MODEL_NAME = "models/gemini-2.0-flash"
@@ -689,5 +689,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
