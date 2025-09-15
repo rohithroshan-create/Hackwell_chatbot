@@ -59,15 +59,15 @@ class WellnessAssistant:
         """Load trained models"""
         try:
             model_files = {
-                'heart_disease': 'models/heart_disease_model.pkl',
-                'diabetes': 'models/diabetes_model.pkl',
-                'hypertension': 'models/hypertension_model.pkl'
+                'heart_disease': 'heart_disease_model.pkl',
+                'diabetes': 'diabetes_model.pkl',
+                'hypertension': 'hypertension_model.pkl'
             }
             
             scaler_files = {
-                'heart_disease': 'models/heart_disease_scaler.pkl',
-                'diabetes': 'models/diabetes_scaler.pkl',
-                'hypertension': 'models/hypertension_scaler.pkl'
+                'heart_disease': 'heart_disease_scaler.pkl',
+                'diabetes': 'diabetes_scaler.pkl',
+                'hypertension': 'hypertension_scaler.pkl'
             }
             
             for condition, file_path in model_files.items():
@@ -76,8 +76,8 @@ class WellnessAssistant:
                     if condition in scaler_files and os.path.exists(scaler_files[condition]):
                         self.scalers[condition] = joblib.load(scaler_files[condition])
             
-            if os.path.exists('models/performance_metrics.pkl'):
-                self.performance_metrics = joblib.load('models/performance_metrics.pkl')
+            if os.path.exists('performance_metrics.pkl'):
+                self.performance_metrics = joblib.load('performance_metrics.pkl')
             
             if not self.models:
                 st.error("⚠️ Models not found. Please upload model files.")
@@ -341,3 +341,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
